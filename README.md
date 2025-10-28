@@ -1,4 +1,4 @@
-# Electrical Room Containment Skill (for Claude)
+# Electrical Room Check (for Claude)
 
 This Claude custom skill analyzes spatial containment of elements (e.g. *electrical equipment*) within rooms using 3D **Axis-Aligned Bounding Boxes (AABB)**, and visualizes results in the **Autodesk Platform Services (APS) Viewer**.
 
@@ -34,8 +34,6 @@ Before using this skill:
    👉 See: [How to create custom skills](https://support.claude.com/en/articles/12512198-how-to-create-custom-skills)
 2. Ensure you have:
    - Autodesk account and API credentials (client ID & secret)
-   - A valid **2-legged token** with `viewables:read` scope
-   - A **base64-encoded URN** for your model derivative
 
 ---
 
@@ -57,6 +55,7 @@ Claude uses AECDM API endpoints (via skill blocks such as `aecdm:GetElementsByEl
 - Room geometry (`category: "Rooms"`)
 - Electrical equipment (`category: "'Electrical Equipment'"`)
 
+Other categories could be swapped in for Electrical Equipment.
 > Note: Category names containing spaces must be wrapped in single quotes.
 
 ### 2. Run Containment Analysis
@@ -147,18 +146,21 @@ You can extend this skill by:
 - APS Viewer © Autodesk, used under [Developer API Terms](https://aps.autodesk.com/terms)
 - This example code is provided for educational purposes — modify freely.
 
+- Great work done by Autodesk Developer Advocated:
+   - Zhong Wu to get the room comparison feature with the AECDM working:
+https://github.com/JohnOnSoftware/aps-aecdm-mcp-dotnet/blob/main/mcp-server-aecdm/AECDMTools.cs#L583
+
+ - Jao:The AEC Data Model .NET MCP https://github.com/autodesk-platform-services/aps-aecdm-mcp-dotnet/tree/main
+   
 ---
 
 ## ✅ Quick Start Summary
 
 | Step | Action |
 |------|--------|
-| 1️⃣ | Upload skill files into Claude |
+| 1️⃣ | Upload skill files into Claude as a zip file |
 | 2️⃣ | Run skill → generates `containment_schedule.json` |
 | 3️⃣ | Open `viewer_room_filter.html` |
 | 4️⃣ | Enter token & URN, upload JSON |
 | 5️⃣ | Explore room-by-room element isolation |
 
----
-
-**Created for Autodesk AEC developers and power users who want to bring real model data to AI.**
