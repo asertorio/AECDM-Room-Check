@@ -150,7 +150,7 @@ You can extend this skill by:
    - Zhong Wu to get the room comparison feature with the AECDM working:
 https://github.com/JohnOnSoftware/aps-aecdm-mcp-dotnet/blob/main/mcp-server-aecdm/AECDMTools.cs#L583
 
- - Jao:The AEC Data Model .NET MCP https://github.com/autodesk-platform-services/aps-aecdm-mcp-dotnet/tree/main
+   - Zhong Wu & Joao Martins: The AEC Data Model .NET MCP https://github.com/autodesk-platform-services/aps-aecdm-mcp-dotnet/tree/main
    
 ---
 
