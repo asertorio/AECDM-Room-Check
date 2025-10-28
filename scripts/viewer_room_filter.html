@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APS Viewer — Room Filter (AABB Results)</title>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    #toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; background: #111; color: #eee; }
+    #left, #right { display: grid; gap: 8px; }
+    label { font-size: 12px; opacity: .9; }
+    input[type="text"], textarea, select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #333; background: #1a1a1a; color: #eee; }
+    button { padding: 10px 12px; border: none; background: #2e7dff; color: white; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    button.secondary { background: #333; }
+    #viewer { height: calc(100% - 220px); background: #000; }
+    #status { font-size: 12px; color: #aaa; padding: 8px 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pill { padding: 2px 8px; border-radius: 9999px; background: #222; color: #bbb; font-size: 11px; }
+    #roomStats { font-size: 12px; color: #ccc; }
+  </style>
+  <!-- APS Viewer v7 CDN -->
+  <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
+  <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.min.css" />
+</head>
+<body>
+  <div id="toolbar">
+    <div id="left">
+      <div class="row">
+        <div>
+          <label>Access Token</label>
+          <input type="text" id="accessToken" placeholder="Paste a valid 2-legged token with 'viewables:read' scope" />
+        </div>
+        <div>
+          <label>Model URN (base64)</label>
+          <input type="text" id="modelUrn" placeholder="e.g. dXJuOmFkc2sub2JqZWN0cy5kZXJpdmF0aXZl... (base64)" />
+        </div>
+      </div>
+      <div class="row">
+        <button id="btnInit">1) Initialize Viewer</button>
+        <button id="btnLoad" class="secondary">2) Load Model</button>
+      </div>
+      <div>
+        <label>Upload Containment Results (JSON from your AABB analysis)</label>
+        <input type="file" id="resultsFile" accept=".json,application/json" />
+      </div>
+      <div class="row">
+        <div>
+          <label>Room</label>
+          <select id="roomSelect"><option value="">-- Load results to populate rooms --</option></select>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end;">
+          <button id="btnShowRoom">Show Room</button>
+          <button id="btnShowAll" class="secondary">Show All</button>
+        </div>
+      </div>
+      <div id="roomStats"></div>
+    </div>
+    <div id="right">
+      <div>
+        <label>Debug / Notes</label>
+        <textarea id="notes" rows="6" readonly></textarea>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="pill" id="pillModel">Model: —</span>
+        <span class="pill" id="pillRooms">Rooms: 0</span>
+        <span class="pill" id="pillElements">Elements: 0</span>
+      </div>
+    </div>
+  </div>
+  <div id="viewer"></div>
+  <div id="status">Ready.</div>
+
+  <script>
+    let viewer = null;
+    let loadedModel = null;
+    let roomIndex = new Map(); // roomName -> { externalIds:Set, ids:Set, items:[...] }
+    let extToDb = new Map();
+
+    function log(msg) {
+      const notes = document.getElementById('notes');
+      notes.value = (notes.value ? notes.value + "\\n" : "") + msg;
+      notes.scrollTop = notes.scrollHeight;
+      document.getElementById('status').innerText = msg;
+      console.log(msg);
+    }
+
+    function updatePills() {
+      document.getElementById('pillModel').innerText = "Model: " + (loadedModel ? "Loaded" : "—");
+      let roomCount = roomIndex.size;
+      let elemCount = 0;
+      for (const [, val] of roomIndex) elemCount += val.items.length;
+      document.getElementById('pillRooms').innerText = "Rooms: " + roomCount;
+      document.getElementById('pillElements').innerText = "Elements: " + elemCount;
+    }
+
+    async function initViewer() {
+      const getToken = async (onSuccess) => {
+        const token = document.getElementById('accessToken').value.trim();
+        if (!token) throw new Error('Access token is required');
+        onSuccess(token, 60);
+      };
+
+      const options = { env: 'AutodeskProduction', getAccessToken: getToken };
+      await Autodesk.Viewing.Initializer(options);
+
+      const htmlDiv = document.getElementById('viewer');
+      viewer = new Autodesk.Viewing.GuiViewer3D(htmlDiv, { extensions: [] });
+      const startedCode = viewer.start();
+      if (startedCode !== 0) {
+        throw new Error('Viewer start failed: ' + startedCode);
+      }
+      log('Viewer initialized.');
+    }
+
+    async function loadModel() {
+      const urn = document.getElementById('modelUrn').value.trim();
+      if (!urn) throw new Error('Model URN is required');
+
+      const doc = await new Promise((resolve, reject) => {
+        Autodesk.Viewing.Document.load('urn:' + urn, resolve, reject);
+      });
+      const defaultViewable = doc.getRoot().getDefaultGeometry();
+      loadedModel = await viewer.loadDocumentNode(doc, defaultViewable);
+      log('Model loaded.');
+
+      // build externalId mapping for fast selection later
+      extToDb.clear();
+      await new Promise((resolve, reject) => {
+        loadedModel.getExternalIdMapping((mapping) => {
+          for (const [extId, dbId] of Object.entries(mapping)) {
+            extToDb.set(extId, dbId);
+          }
+          log('ExternalId mapping size: ' + extToDb.size);
+          resolve();
+        });
+      });
+    }
+
+    function onResultsLoaded(json) {
+      roomIndex.clear();
+      const items = Array.isArray(json) ? json : [];
+      for (const item of items) {
+        const room = item.room_name || item.room || "UNASSIGNED";
+        if (!roomIndex.has(room)) {
+          roomIndex.set(room, { externalIds: new Set(), ids: new Set(), items: [] });
+        }
+        const entry = roomIndex.get(room);
+        if (item.externalId) entry.externalIds.add(String(item.externalId));
+        if (item.id) entry.ids.add(String(item.id));
+        entry.items.push(item);
+      }
+
+      const sel = document.getElementById('roomSelect');
+      sel.innerHTML = "";
+      for (const room of roomIndex.keys()) {
+        const opt = document.createElement('option');
+        opt.value = room; opt.textContent = room;
+        sel.appendChild(opt);
+      }
+      updatePills();
+      log('Results loaded. Rooms available: ' + roomIndex.size);
+    }
+
+    async function showRoom() {
+      if (!loadedModel) return log('Model not loaded.');
+      const room = document.getElementById('roomSelect').value;
+      if (!room) return log('Pick a room first.');
+      const rec = roomIndex.get(room);
+      if (!rec) return log('No data for room: ' + room);
+
+      const dbIds = new Set();
+      for (const ext of rec.externalIds) {
+        const id = extToDb.get(ext);
+        if (typeof id === 'number') dbIds.add(id);
+      }
+      if (dbIds.size === 0) {
+        log('No matching dbIds found for room: ' + room);
+        return;
+      }
+
+      const idsArray = Array.from(dbIds);
+      viewer.isolate(idsArray);
+      viewer.fitToView(idsArray);
+      const stats = `${room}: ${idsArray.length} element(s) isolated.`;
+      document.getElementById('roomStats').innerText = stats;
+      log(stats);
+    }
+
+    function showAll() {
+      if (!viewer) return;
+      viewer.isolate([]);
+      viewer.fitToView();
+      document.getElementById('roomStats').innerText = '';
+      log('Show all elements.');
+    }
+
+    document.getElementById('btnInit').addEventListener('click', async () => {
+      try { await initViewer(); } catch (e) { log('Init error: ' + e.message); }
+    });
+    document.getElementById('btnLoad').addEventListener('click', async () => {
+      try { await loadModel(); } catch (e) { log('Load error: ' + e.message); }
+    });
+    document.getElementById('btnShowRoom').addEventListener('click', showRoom);
+    document.getElementById('btnShowAll').addEventListener('click', showAll);
+    document.getElementById('resultsFile').addEventListener('change', async (evt) => {
+      const f = evt.target.files[0];
+      if (!f) return;
+      const text = await f.text();
+      try {
+        const json = JSON.parse(text);
+        onResultsLoaded(json);
+      } catch (e) {
+        log('JSON parse error: ' + e.message);
+      }
+    });
+  </script>
+</body>
+</html>
