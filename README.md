@@ -7,7 +7,7 @@ This Claude custom skill analyzes spatial containment of elements (e.g. *electri
 ## 🧠 Overview
 
 This skill lets Claude automatically:
-1. Retrieve **AEC Data Model** elements (Rooms + Electrical Equipment)
+1. Retrieve **AEC Data Model** elements using the AECDM MCP (Rooms + Electrical Equipment)
 2. Compute **containment relationships** via Python AABB analysis
 3. Generate a JSON schedule of results
 4. Load the schedule in an **interactive APS Viewer** to visualize which elements are within each room.
@@ -34,6 +34,8 @@ Before using this skill:
    👉 See: [How to create custom skills](https://support.claude.com/en/articles/12512198-how-to-create-custom-skills)
 2. Ensure you have:
    - Autodesk account and API credentials (client ID & secret)
+3. Install the AECDM MCP. This will allow Claude to talk to the AECDM and run Auth.
+   👉 See: [APS MCP DOTNET](https://github.com/autodesk-platform-services/aps-aecdm-mcp-dotnet/tree/main)
 
 ---
 
